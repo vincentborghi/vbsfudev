@@ -274,11 +274,11 @@ function injectUI() {
         }
     };
 
-    copyButton.onclick = () => {
+    copyButton.onclick = async () => {
         statusDiv.textContent = '';
         statusDiv.style.color = 'var(--vbsfu-status-success)';
         // Note: findCaseNumberSpecific() is defined in content.js and available globally here.
-        const recordNumber = findCaseNumberSpecific();
+        const recordNumber = await findCaseNumberSpecific();
         const currentUrl = window.location.href;
         let objectType = currentUrl.includes('/Case/') ? 'Case' : 'WorkOrder';
 

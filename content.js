@@ -94,10 +94,31 @@ function findSubjectInContainer(container) {
     return element ? element.textContent?.trim() : 'N/A (Subject)';
 }
 
-function findCaseNumberSpecific(baseElement) {
+// in content.js
+
+async function findCaseNumberSpecific(baseElement) {
+    let searchContext = baseElement;
+
+    // If no baseElement is provided, find the active tab panel.
+    if (!searchContext) {
+        const activeTabButton = await waitForElement('li.slds-is-active[role="presentation"] a[role="tab"]');
+        if (activeTabButton) {
+            const panelId = activeTabButton.getAttribute('aria-controls');
+            if (panelId) {
+                searchContext = document.getElementById(panelId);
+            }
+        }
+    }
+
+    // If a specific context couldn't be found, default to the document.
+    if (!searchContext) {
+        console.warn('VBSFU: Could not determine a specific search context for record number. Defaulting to document.');
+        searchContext = document;
+    }
+
     const itemSelector = 'records-highlights-details-item:has(p[title="Case Number"])';
     const textSelector = 'lightning-formatted-text';
-    const detailsItem = baseElement.querySelector(itemSelector);
+    const detailsItem = searchContext.querySelector(itemSelector);
 
     if (detailsItem) {
         const textElement = detailsItem.querySelector(textSelector);
