@@ -94,8 +94,6 @@ function findSubjectInContainer(container) {
     return element ? element.textContent?.trim() : 'N/A (Subject)';
 }
 
-// in content.js
-
 async function findCaseNumberSpecific(baseElement) {
     let searchContext = baseElement;
 
@@ -239,7 +237,6 @@ async function processNotesList(baseElement) {
 
 async function processEmailsList(baseElement) {
     console.log("Processing Related List: Emails");
-    // const containerSelector = '.forceRelatedListSingleContainer:has(span[title="Emails"])';
     const containerSelector = '.forceRelatedListPreviewAdvancedGrid:has(span[title="Emails"])';
     const closeButtonSelector = 'button.slds-button_icon[title^="Close Emails"]';
     
@@ -247,7 +244,7 @@ async function processEmailsList(baseElement) {
     if (!listContainer) { return []; }
 
     let didClickViewAll = false;
-    const viewAllLink = listContainer.querySelector('.slds-card__footer'); // VB
+    const viewAllLink = listContainer.querySelector('.slds-card__footer');
     
     if (viewAllLink && viewAllLink.offsetParent !== null) {
         console.log("Emails: 'View All' link is visible. Clicking...");
@@ -393,18 +390,13 @@ async function generateCaseViewHtml(generatedTime) {
     }
 
     const subject = findSubjectInContainer(highlightsContainerElement);
-    const recordNumber = findCaseNumberSpecific(activeTabPanel);
+    const recordNumber = await findCaseNumberSpecific(activeTabPanel);
     const status = findStatusInContainer(highlightsContainerElement);
     const owner = findOwnerInContainer(highlightsContainerElement);
     const creatorName = await findCreatorName(activeTabPanel);
     const accountName = await findAccountName(activeTabPanel);
     const createdDateStr = await findCreatedDate(activeTabPanel);
     const description = await findCaseDescription(activeTabPanel);
-    
-    // --- SEQUENTIALLY PROCESS RELATED LISTS ---
-    
-    
-
     
      // --- SEQUENTIALLY PROCESS AND FETCH RELATED LISTS ---
 
@@ -417,10 +409,9 @@ async function generateCaseViewHtml(generatedTime) {
         try {
             const noteDetailsResponse = await sendMessagePromise({ action: "fetchItemDetails", items: notesToFetch });
             if (noteDetailsResponse?.status === 'success' && noteDetailsResponse.details) {
-                // The background script now sends a unified data model.
                 processedNotes = Object.values(noteDetailsResponse.details).map(detail => ({
                     ...detail,
-                    dateObject: new Date(detail.dateObject) // Ensure it's a Date object
+                    dateObject: new Date(detail.dateObject) 
                 }));
             }
         } catch (error) {
@@ -438,10 +429,9 @@ async function generateCaseViewHtml(generatedTime) {
         try {
             const emailDetailsResponse = await sendMessagePromise({ action: "fetchItemDetails", items: emailsToFetch });
             if (emailDetailsResponse?.status === 'success' && emailDetailsResponse.details) {
-                // The background script also sends a unified model for emails.
                 processedEmails = Object.values(emailDetailsResponse.details).map(detail => ({
                     ...detail,
-                    dateObject: new Date(detail.dateObject) // Ensure it's a Date object
+                    dateObject: new Date(detail.dateObject)
                 }));
             }
         } catch (error) {
@@ -465,8 +455,6 @@ async function generateCaseViewHtml(generatedTime) {
     statusDiv.textContent = 'Processing Work Orders...';
     const workOrdersData = await processWorkOrdersList(activeTabPanel);
 
-    // Make sure the rest of your code uses `validTimelineItems` for the timeline header and the forEach loop.
-
     // --- Build HTML ---
     statusDiv.textContent = 'Generating HTML...';
     const safeRecordNumber = escapeHtml(recordNumber || 'N/A');
@@ -489,12 +477,12 @@ async function generateCaseViewHtml(generatedTime) {
         <div class="debug-info-section">
             <h2>Debug Info</h2>
             <details>
-                <summary>Fetched Notes Data (${notesToFetch.length} items)</summary>
-                <pre>${escapeHtml(JSON.stringify(notesToFetch.map(n => ({...n, content: undefined})), null, 2))}</pre>
+                <summary>Fetched Notes Data (${processedNotes.length} items)</summary>
+                <pre>${escapeHtml(JSON.stringify(processedNotes, null, 2))}</pre>
             </details>
             <details>
-                <summary>Fetched Emails Data (${emailsToFetch.length} items)</summary>
-                <pre>${escapeHtml(JSON.stringify(emailsToFetch.map(e => ({...e, content: undefined})), null, 2))}</pre>
+                <summary>Fetched Emails Data (${processedEmails.length} items)</summary>
+                <pre>${escapeHtml(JSON.stringify(processedEmails, null, 2))}</pre>
             </details>
             <details>
                 <summary>Work Orders Table Data (${workOrdersData ? workOrdersData.count : 0} items)</summary>
@@ -583,20 +571,21 @@ async function generateCaseViewHtml(generatedTime) {
             <div class="description-content">${description || '<p><i>Description empty or not found.</i></p>'}</div>
         </div>
         <div class="timeline-header">
-            <h2>Timeline (${allTimelineItems.length} items)</h2>
+            <h2>Timeline (${validTimelineItems.length} items)</h2>
             <a href="#" id="toggle-all-timeline">Collapse All</a>
         </div>
     `;
 
-    if (allTimelineItems.length === 0) {
+    if (validTimelineItems.length === 0) {
         htmlOutput += "<p>No Notes or Emails found or extracted successfully.</p>";
     } else {
-        allTimelineItems.forEach(item => {
+        validTimelineItems.forEach(item => {
             let contentHtml = '';
-            if (item.description && (item.description.startsWith('Error:') || item.description.startsWith('[Fetch Error') || item.description.startsWith('[Body Fetch Error') || item.description.startsWith('[Content'))) {
-               contentHtml = `<span class="error-message">${escapeHtml(item.description)}</span>`;
+            // Use the unified 'content' property
+            if (item.content && (item.content.startsWith('Error:') || item.content.startsWith('[Fetch Error') || item.content.startsWith('[Body Fetch Error') || item.content.startsWith('[Content'))) {
+               contentHtml = `<span class="error-message">${escapeHtml(item.content)}</span>`;
             } else {
-               contentHtml = item.description || '<i>[Content Missing]</i>';
+               contentHtml = item.content || '<i>[Content Missing]</i>';
             }
 
             let visibilityLabel = '';
@@ -617,7 +606,8 @@ async function generateCaseViewHtml(generatedTime) {
 
             const itemTypeClass = `type-${escapeHtml(item.type?.toLowerCase() || 'unknown')}`;
             const itemTypeLabel = escapeHtml(item.type || 'Item');
-            const itemTitle = escapeHtml(item.subject || 'N/A');
+            // Use the unified 'title' property
+            const itemTitle = escapeHtml(item.title || 'N/A');
             const itemAuthor = escapeHtml(item.author || 'N/A');
             const itemTo = escapeHtml(item.to || 'N/A');
 
@@ -684,14 +674,14 @@ async function generateCaseViewHtml(generatedTime) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log(`Content Script: Received message action="${message.action}"`);
 
-    if (message.action === "generateFullCaseView") {
-        console.log("Content Script: Handling 'generateFullCaseView' command.");
+    if (message.action === "generateFullView") {
+        console.log("Content Script: Handling 'generateFullView' command.");
         const now = new Date();
         const generatedTime = now.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'medium' });
         const statusDiv = document.getElementById('vbsfu-status');
         if (statusDiv) {
             statusDiv.textContent = 'Extracting data...';
-            statusDiv.style.color = 'orange';
+            statusDiv.style.color = 'var(--vbsfu-status-warn)';
         }
 
         generateCaseViewHtml(generatedTime)
@@ -699,7 +689,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.log("Content Script: HTML generation complete. Sending to background.");
             if (statusDiv) {
                 statusDiv.textContent = 'Opening results...';
-                statusDiv.style.color = 'green';
+                statusDiv.style.color = 'var(--vbsfu-status-success)';
             }
             chrome.runtime.sendMessage({ action: "openFullViewTab", htmlContent: fullHtml });
 
@@ -715,7 +705,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.error("Content Script: Error during HTML generation:", error);
             if (statusDiv) {
                 statusDiv.textContent = 'Error generating view!';
-                statusDiv.style.color = 'red';
+                statusDiv.style.color = 'var(--vbsfu-status-error)';
             }
             chrome.runtime.sendMessage({
                 action: "openFullViewTab",
@@ -750,7 +740,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const statusDiv = document.getElementById('vbsfu-status');
         if (statusDiv) {
             statusDiv.textContent = `Fetching ${message.itemType} ${message.index}/${message.total}...`;
-            statusDiv.style.color = 'orange';
+            statusDiv.style.color = 'var(--vbsfu-status-warn)';
         }
         return false;
     }
