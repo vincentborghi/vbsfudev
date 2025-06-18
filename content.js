@@ -403,37 +403,69 @@ async function generateCaseViewHtml(generatedTime) {
     
     // --- SEQUENTIALLY PROCESS RELATED LISTS ---
     
+    
+
+    
+     // --- SEQUENTIALLY PROCESS AND FETCH RELATED LISTS ---
+
+    // 1. Process and Fetch Notes
     statusDiv.textContent = 'Processing Notes...';
     const notesToFetch = await processNotesList(activeTabPanel);
-    
+    let processedNotes = [];
+    if (notesToFetch.length > 0) {
+        statusDiv.textContent = `Fetching ${notesToFetch.length} Note(s)...`;
+        try {
+            const noteDetailsResponse = await sendMessagePromise({ action: "fetchItemDetails", items: notesToFetch });
+            if (noteDetailsResponse?.status === 'success' && noteDetailsResponse.details) {
+                // The background script now sends a unified data model.
+                processedNotes = Object.values(noteDetailsResponse.details).map(detail => ({
+                    ...detail,
+                    dateObject: new Date(detail.dateObject) // Ensure it's a Date object
+                }));
+            }
+        } catch (error) {
+            console.error("Error fetching note details:", error);
+            statusDiv.textContent = 'Error fetching notes.';
+        }
+    }
+
+    // 2. Process and Fetch Emails
     statusDiv.textContent = 'Processing Emails...';
     const emailsToFetch = await processEmailsList(activeTabPanel);
-    
-    statusDiv.textContent = 'Processing Work Orders...';
-    const workOrdersData = await processWorkOrdersList(activeTabPanel);
-    
-    // --- Fetch Details in Parallel ---
-    statusDiv.textContent = 'Fetching Details...';
-    const allItemsToFetch = [...notesToFetch, ...emailsToFetch];
-    let fetchedDetails = {};
-    if (allItemsToFetch.length > 0) {
-        const response = await sendMessagePromise({ action: "fetchItemDetails", items: allItemsToFetch });
-        if (response?.status === 'success') {
-            fetchedDetails = response.details;
+    let processedEmails = [];
+    if (emailsToFetch.length > 0) {
+        statusDiv.textContent = `Fetching ${emailsToFetch.length} Email(s)...`;
+        try {
+            const emailDetailsResponse = await sendMessagePromise({ action: "fetchItemDetails", items: emailsToFetch });
+            if (emailDetailsResponse?.status === 'success' && emailDetailsResponse.details) {
+                // The background script also sends a unified model for emails.
+                processedEmails = Object.values(emailDetailsResponse.details).map(detail => ({
+                    ...detail,
+                    dateObject: new Date(detail.dateObject) // Ensure it's a Date object
+                }));
+            }
+        } catch (error) {
+            console.error("Error fetching email details:", error);
+            statusDiv.textContent = 'Error fetching emails.';
         }
     }
     
     // --- Combine and Sort Data ---
-    const allTimelineItems = allItemsToFetch.map(item => {
-        const details = fetchedDetails[item.url] || {};
-        return {
-            ...item,
-            ...details,
-            dateObject: new Date(details.dateObject || item.dateStr)
-        };
-    }); // .filter(item => item.dateObject && !isNaN(item.dateObject.getTime()));
+    statusDiv.textContent = 'Combining data...';
+    const allTimelineItems = [...processedNotes, ...processedEmails];
 
-    allTimelineItems.sort((a, b) => a.dateObject - b.dateObject);
+    // Filter out any items that resulted in an invalid date for robust sorting
+    const validTimelineItems = allTimelineItems.filter(item => item.dateObject && !isNaN(item.dateObject.getTime()));
+
+    // Sort the valid items by date
+    validTimelineItems.sort((a, b) => a.dateObject - b.dateObject);
+
+    // For future
+    
+    statusDiv.textContent = 'Processing Work Orders...';
+    const workOrdersData = await processWorkOrdersList(activeTabPanel);
+
+    // Make sure the rest of your code uses `validTimelineItems` for the timeline header and the forEach loop.
 
     // --- Build HTML ---
     statusDiv.textContent = 'Generating HTML...';

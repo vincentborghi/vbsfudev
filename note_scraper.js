@@ -32,6 +32,8 @@ function waitForElement(selector, baseElement = document, timeout = 10000) {
 // Main scraping logic wrapped in an async function
 async function scrapeNoteDetails() {
     console.log("Note Scraper: Starting scrapeNoteDetails.");
+    let title = null;
+    let author = null;
     let description = null;
     let createdDateText = null;
     let isPublic = false; // VB Default to internal/false
@@ -83,6 +85,29 @@ async function scrapeNoteDetails() {
 	}
         // VB END
 
+        // Add these new scraping blocks within the main 'try' block
+        
+        // --- Extract Title ---
+        const titleElement = await waitForElement('h1.slds-page-header__title');
+        if (titleElement) {
+            title = titleElement.textContent?.trim();
+            console.log("Note Scraper: Extracted Title:", title);
+        } else {
+            console.warn("Note Scraper: Title H1 element not found.");
+        }
+        
+        // --- Extract Created By for Author ---
+        const createdByItemForAuthor = await waitForElement('records-record-layout-item[field-label="Created By"]');
+        if (createdByItemForAuthor) {
+            const authorElement = await waitForElement('force-lookup a', createdByItemForAuthor);
+            if (authorElement) {
+                author = authorElement.textContent?.trim();
+                console.log("Note Scraper: Extracted Author:", author);
+            } else {
+                console.warn("Note Scraper: Author link not found in 'Created By' item.");
+            }
+        }
+
         // --- Extract Created Date ---
         // Wait for the 'Created By' item container
         const createdByItemSelector = 'records-record-layout-item[field-label="Created By"]';
@@ -124,6 +149,8 @@ async function scrapeNoteDetails() {
     console.log("Note Scraper: Sending results back:", { description: description ?? '', createdDateText: createdDateText });
     chrome.runtime.sendMessage({
         type: 'noteScrapeResult',
+        title: title, // new
+        author: author, // new
         description: description ?? '', // Ensure string even if null
         createdDateText: createdDateText, // Send raw text for parsing in background
 	isPublic: isPublic // VB
