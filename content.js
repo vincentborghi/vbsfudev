@@ -561,10 +561,10 @@ async function generateCaseViewHtml(generatedTime) {
     } else {
         allTimelineItems.forEach(item => {
             let contentHtml = '';
-            if (item.content && (item.content.startsWith('Error:') || item.content.startsWith('[Fetch Error') || item.content.startsWith('[Body Fetch Error') || item.content.startsWith('[Content'))) {
-               contentHtml = `<span class="error-message">${escapeHtml(item.content)}</span>`;
+            if (item.description && (item.description.startsWith('Error:') || item.description.startsWith('[Fetch Error') || item.description.startsWith('[Body Fetch Error') || item.description.startsWith('[Content'))) {
+               contentHtml = `<span class="error-message">${escapeHtml(item.description)}</span>`;
             } else {
-               contentHtml = item.content || '<i>[Content Missing]</i>';
+               contentHtml = item.description || '<i>[Content Missing]</i>';
             }
 
             let visibilityLabel = '';
@@ -585,7 +585,7 @@ async function generateCaseViewHtml(generatedTime) {
 
             const itemTypeClass = `type-${escapeHtml(item.type?.toLowerCase() || 'unknown')}`;
             const itemTypeLabel = escapeHtml(item.type || 'Item');
-            const itemTitle = escapeHtml(item.title || 'N/A');
+            const itemTitle = escapeHtml(item.subject || 'N/A');
             const itemAuthor = escapeHtml(item.author || 'N/A');
             const itemTo = escapeHtml(item.to || 'N/A');
 
